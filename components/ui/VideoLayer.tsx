@@ -5,6 +5,7 @@ import { VIDEO_CUES, type VideoCue } from '@/lib/content';
 import { clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
 import { pointer } from '@/lib/pointer';
+import { useIsMobile } from '@/lib/useIsMobile';
 
 /**
  * Cinematic plates composited over the live world.
@@ -79,21 +80,19 @@ const buildMask = (w: number, h: number) => {
  *     still frame until it takes over. The crossfade survives, the contention
  *     does not.
  */
-const useIsMobile = () => {
-  const [mobile, setMobile] = useState(false);
-
-  useEffect(() => {
-    const q = window.matchMedia('(max-width: 820px), (pointer: coarse)');
-    const update = () => setMobile(q.matches);
-    update();
-    q.addEventListener('change', update);
-    return () => q.removeEventListener('change', update);
-  }, []);
-
-  return mobile;
-};
+// Shared with Experience — see lib/useIsMobile.ts
 
 const mobileSrc = (src: string) => src.replace('/video/', '/video/mobile/');
+
+/*
+  Poster frame — roughly 30 kB against a 2.7 MB clip.
+
+  It paints the moment the plate is needed, so a slow connection shows the
+  right image immediately and the video simply takes over when it arrives,
+  instead of holding a black frame for the length of a download.
+*/
+const posterFor = (src: string) =>
+  src.replace('/video/', '/video/poster/').replace(/\.mp4$/, '.jpg');
 
 /** Recomputes the mask whenever the viewport changes shape. */
 const useGlyphMask = () => {
@@ -245,6 +244,7 @@ function Plate({
   const ref = useRef<HTMLVideoElement>(null);
   const loaded = useRef(false);
   const playing = useRef(false);
+  const lastPlayAttempt = useRef(0);
 
   useEffect(() => {
     const el = ref.current;
@@ -335,11 +335,27 @@ function Plate({
       */
       const threshold = isMobile ? cue.peak * 0.5 : 0.01;
       const shouldPlay = opacity > threshold && loaded.current;
-      if (shouldPlay && !playing.current) {
+
+      /*
+        Retries are rate-limited.
+
+        A browser can refuse playback for reasons the page cannot fix — iOS Low
+        Power Mode blocks autoplay outright, even for muted inline video, and a
+        backgrounded document is paused the instant it starts. Without a floor
+        between attempts this becomes a hot loop calling play() on every frame
+        for the entire visit, which burns battery precisely on the devices least
+        able to spare it.
+
+        Backing off to a few attempts a second still recovers within a frame or
+        two of conditions changing, and the poster keeps the right image on
+        screen in the meantime, so a refusal degrades to a still rather than to
+        black.
+      */
+      const now = performance.now();
+      if (shouldPlay && el.paused && now - lastPlayAttempt.current > 260) {
+        lastPlayAttempt.current = now;
         playing.current = true;
         void el.play().catch(() => {
-          // A rejected play must clear the flag, otherwise the retry never comes
-          // and the plate is stranded on a still frame for the whole visit.
           playing.current = false;
         });
       } else if (!shouldPlay && playing.current) {
@@ -374,6 +390,7 @@ function Plate({
     <video
       ref={ref}
       src={isMobile && cue.src ? mobileSrc(cue.src) : (cue.src ?? undefined)}
+      poster={cue.src ? posterFor(cue.src) : undefined}
       muted
       loop
       playsInline

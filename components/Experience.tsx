@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getTier } from '@/lib/journeyState';
 import { RENDER_DISTRICT_GEOMETRY } from '@/lib/journey';
+import { useIsMobile } from '@/lib/useIsMobile';
 
 import { CameraRig } from './world/CameraRig';
 import { Atmosphere } from './world/Atmosphere';
@@ -30,6 +31,7 @@ import { Ascent } from './world/Ascent';
  */
 export function Experience() {
   const tier = getTier();
+  const isMobile = useIsMobile();
 
   const gl = useMemo(
     () => ({
@@ -49,6 +51,27 @@ export function Experience() {
     () => (tier === 'high' ? [1, 2] : tier === 'mid' ? [1, 1.5] : [0.75, 1]),
     [tier]
   );
+
+  /*
+    No WebGL on a phone.
+
+    Everything this canvas still draws is either desktop-only or invisible on a
+    handset: the modelled districts are off, the particle strata are gone, and
+    CursorDraw requires a fine pointer. What remains is velocity streaks, which
+    only appear while scrolling.
+
+    That is a full-screen GL context, a render loop and a block of GPU memory
+    producing almost nothing — and it competes directly with the video decoder,
+    which is the one thing on a phone that genuinely matters here. Dropping it
+    removes the lag and gives the decoder its memory back.
+
+    Nothing else depends on it: scroll position comes from ScrollController and
+    all typography is DOM, so the journey is unaffected.
+
+    Placed AFTER the hooks above, never before — an early return ahead of a
+    useMemo changes hook order between renders and React throws.
+  */
+  if (isMobile) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[3]">

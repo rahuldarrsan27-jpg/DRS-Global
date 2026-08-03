@@ -301,6 +301,16 @@
      memory and compositor work than the ~1 repaint per second it saves. */
 }
 
+/* Frozen on touch devices: a full-viewport repeating repaint is a real cost on
+   a phone, and static grain is visually near-identical at this opacity.
+   Must follow the rule above — a media query adds no specificity, so this only
+   wins on source order. */
+@media (pointer: coarse) {
+  .film-grain {
+    animation: none;
+  }
+}
+
 /* Sound toggle level meter. Staggered per bar via inline animation-delay. */
 @keyframes eq {
   0%,
