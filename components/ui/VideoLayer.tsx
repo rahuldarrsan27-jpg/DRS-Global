@@ -196,10 +196,19 @@ export function VideoLayer() {
   return (
     <div className="pointer-events-none fixed inset-0 z-[2] overflow-hidden">
       {active.map((cue, i) => {
-        // A phone keeps two elements alive, not three: the outgoing plate is
-        // already past and every extra element is another decoder held open.
-        const near = isMobile ? i - index >= 0 && i - index <= 1 : Math.abs(i - index) <= 1;
-        if (!near) return null;
+        /*
+          The previous plate stays mounted, on every device.
+
+          Dropping it to save a decoder was a false economy: unmounting destroys
+          the element and everything it had buffered, so scrolling back up meant
+          refetching the whole clip from zero — the division you had just watched
+          took as long to return as it did the first time.
+
+          A paused element is cheap; it is *playing* two at once that starves a
+          mobile decoder, and that is handled separately by the play threshold
+          below.
+        */
+        if (Math.abs(i - index) > 1) return null;
         return (
           <Plate
             key={cue.id}
@@ -267,18 +276,25 @@ function Plate({
       const t = journey.t;
 
       /*
-        Open the element up for fetching once we're near the cue.
+        Start fetching once we're near the cue — and actually start it.
 
-        Deliberately does NOT call load(). load() resets the media element and
-        aborts any play() already in flight — and since playback is started the
-        moment opacity goes positive, that reset silently strands the video
-        paused on its first frame with no retry. Raising `preload` is enough of a
-        hint; play() drives the fetch itself.
+        Raising `preload` alone is not enough. Mobile Safari largely ignores a
+        preload attribute changed after the element has rendered, so the download
+        only ever began at play() — which on a phone is gated until the plate is
+        already the one being looked at. The fetch therefore started at the exact
+        moment the frame was needed, which is why the next division took forever
+        to appear.
+
+        load() is safe HERE and nowhere else: this runs once, before playback has
+        ever been requested for this element, so there is no in-flight play() for
+        it to abort. Calling load() after play() is what previously stranded
+        plates frozen on their first frame, hence the explicit guard.
       */
       const near = t > win.inFrom - 0.1 && t < cue.end + 0.1;
       if (near && gateOpen && journey.ready && !loaded.current) {
         loaded.current = true;
         el.preload = 'auto';
+        if (!playing.current) el.load();
       }
 
       // Degenerate windows mean "no fade on this side" — the first plate is
