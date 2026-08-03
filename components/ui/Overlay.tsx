@@ -5,6 +5,7 @@ import { CHAPTERS, clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
 import { COPY, BRAND, CTA, CONTACT, ABOUT } from '@/lib/content';
 import { ActionButton } from './ActionButton';
+import { RevealLines } from './RevealLines';
 
 /**
  * Scroll-synced typography.
@@ -132,10 +133,16 @@ export function Overlay() {
         panelRef={register('forge', { ...CHAPTERS[0], holdIn: true })}
         className="items-center justify-center text-center"
       >
-        <p className="eyebrow mb-7">{COPY.forge.eyebrow}</p>
-        <h1 className="display mb-8">{BRAND.name}</h1>
-        <div className="hairline mb-8 w-[min(560px,70vw)]" />
-        <p className="font-mono text-[clamp(10px,0.9vw,13px)] uppercase tracking-[0.22em] text-[color:var(--muted)]">
+        <p className="eyebrow reveal-item mb-7">{COPY.forge.eyebrow}</p>
+        <RevealLines as="h1" text={BRAND.name} className="display mb-8" delay={120} />
+        <div
+          className="hairline reveal-item mb-8 w-[min(560px,70vw)]"
+          style={{ transitionDelay: '420ms' }}
+        />
+        <p
+          className="reveal-item font-mono text-[clamp(10px,0.9vw,13px)] uppercase tracking-[0.22em] text-[color:var(--muted)]"
+          style={{ transitionDelay: '540ms' }}
+        >
           Engineering Industries<span className="mx-3 text-[color:var(--accent)]">·</span>
           Connecting Markets<span className="mx-3 text-[color:var(--accent)]">·</span>
           Enabling Growth
@@ -147,8 +154,8 @@ export function Overlay() {
         panelRef={register('descent', CHAPTERS[1])}
         className="items-center justify-center text-center"
       >
-        <p className="eyebrow mb-6">{COPY.descent.eyebrow}</p>
-        <h2 className="display-sm whitespace-pre-line">{COPY.descent.title}</h2>
+        <p className="eyebrow reveal-item mb-6">{COPY.descent.eyebrow}</p>
+        <RevealLines as="h2" text={COPY.descent.title ?? ''} className="display-sm" delay={100} />
       </Panel>
 
       {/* -------------------------------------------------------------- III */}
@@ -158,9 +165,16 @@ export function Overlay() {
         className="items-start justify-end pb-[14vh]"
       >
         <div className="max-w-[min(760px,88vw)]">
-          <p className="eyebrow mb-6">{COPY.blueprint.eyebrow}</p>
-          <h2 className="display-sm mb-7 whitespace-pre-line">{COPY.blueprint.title}</h2>
-          <p className="lede">{COPY.blueprint.body}</p>
+          <p className="eyebrow reveal-item mb-6">{COPY.blueprint.eyebrow}</p>
+          <RevealLines
+            as="h2"
+            text={COPY.blueprint.title ?? ''}
+            className="display-sm mb-7"
+            delay={100}
+          />
+          <p className="lede reveal-item" style={{ transitionDelay: '300ms' }}>
+            {COPY.blueprint.body}
+          </p>
         </div>
       </Panel>
 
@@ -182,14 +196,23 @@ export function Overlay() {
                     <span className="numeral">{chapter.numeral}</span>
                     <p className="eyebrow">{copy.eyebrow}</p>
                   </div>
-                  <h2 className="display mb-7 whitespace-pre-line">{copy.title}</h2>
-                  <p className="lede">{copy.body}</p>
+                  <RevealLines as="h2" text={copy.title ?? ''} className="display mb-7" />
+                  <p className="lede reveal-item" style={{ transitionDelay: '260ms' }}>
+                    {copy.body}
+                  </p>
                 </div>
 
                 {copy.services && (
                   <ul className="grid grid-cols-2 gap-x-8 sm:grid-cols-2">
-                    {copy.services.map((s) => (
-                      <li key={s} className="service-item">
+                    {copy.services.map((s, i) => (
+                      <li
+                        key={s}
+                        className="service-item reveal-item"
+                        // Cascade down the list. Capped so a thirteen-item
+                        // division does not still be arriving after the visitor
+                        // has scrolled past it.
+                        style={{ transitionDelay: `${360 + Math.min(i, 12) * 42}ms` }}
+                      >
                         {s}
                       </li>
                     ))}
@@ -206,10 +229,15 @@ export function Overlay() {
         panelRef={register('close', BEAT_CLOSE)}
         className="items-center justify-center text-center"
       >
-        <p className="eyebrow mb-7">{COPY.ascent.eyebrow}</p>
-        <h2 className="display mb-8 whitespace-pre-line">{COPY.ascent.title}</h2>
-        <div className="hairline mb-8 w-[min(560px,70vw)]" />
-        <p className="lede mx-auto text-center">{COPY.ascent.body}</p>
+        <p className="eyebrow reveal-item mb-7">{COPY.ascent.eyebrow}</p>
+        <RevealLines as="h2" text={COPY.ascent.title ?? ''} className="display mb-8" delay={120} />
+        <div
+          className="hairline reveal-item mb-8 w-[min(560px,70vw)]"
+          style={{ transitionDelay: '440ms' }}
+        />
+        <p className="lede reveal-item mx-auto text-center" style={{ transitionDelay: '560ms' }}>
+          {COPY.ascent.body}
+        </p>
       </Panel>
 
       {/* ------------------------------------------------- X · beat 2 ----- */}
@@ -222,13 +250,17 @@ export function Overlay() {
             right, so neither column runs to an unreadable measure. */}
         <div className="grid w-full grid-cols-1 items-end gap-x-14 gap-y-8 lg:grid-cols-[0.85fr_1.15fr]">
           <div>
-            <p className="eyebrow mb-6">{ABOUT.eyebrow}</p>
-            <h2 className="display-sm whitespace-pre-line">{ABOUT.title}</h2>
+            <p className="eyebrow reveal-item mb-6">{ABOUT.eyebrow}</p>
+            <RevealLines as="h2" text={ABOUT.title} className="display-sm" delay={100} />
           </div>
 
           <div>
-            <p className="lede mb-4 max-w-none">{ABOUT.body}</p>
-            <p className="lede max-w-none">{ABOUT.body2}</p>
+            <p className="lede reveal-item mb-4 max-w-none" style={{ transitionDelay: '320ms' }}>
+              {ABOUT.body}
+            </p>
+            <p className="lede reveal-item max-w-none" style={{ transitionDelay: '440ms' }}>
+              {ABOUT.body2}
+            </p>
           </div>
         </div>
       </Panel>
@@ -248,9 +280,14 @@ export function Overlay() {
           <div className="grid grid-cols-1 items-end gap-x-14 gap-y-10 lg:grid-cols-[1.1fr_0.9fr]">
             {/* The ask */}
             <div>
-              <h2 className="display-sm mb-6">{CTA.headline}</h2>
-              <p className="lede mb-9">{CTA.intro}</p>
-              <div className="pointer-events-auto flex flex-wrap items-center gap-3">
+              <RevealLines as="h2" text={CTA.headline} className="display-sm mb-6" delay={100} />
+              <p className="lede reveal-item mb-9" style={{ transitionDelay: '300ms' }}>
+                {CTA.intro}
+              </p>
+              <div
+                className="reveal-item pointer-events-auto flex flex-wrap items-center gap-3"
+                style={{ transitionDelay: '440ms' }}
+              >
                 {CTA.actions.map((a) => (
                   <ActionButton key={a.label} href={a.href} primary={a.primary}>
                     {a.label}

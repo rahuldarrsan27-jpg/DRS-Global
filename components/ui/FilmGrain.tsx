@@ -33,14 +33,25 @@ export function FilmGrain() {
         }}
       />
 
-      {/* Grain */}
+      {/*
+        Grain, composited plainly.
+
+        An earlier version used `mix-blend-mode: overlay`, which looks marginally
+        richer and is disproportionately expensive: a full-screen blended layer
+        forces the compositor to flatten the entire stacking context beneath it —
+        ten video elements — into a buffer on every repaint. It was slow enough
+        to stall screenshot capture on this machine, which is a fair proxy for
+        what it does to a mid-range phone.
+
+        Plain alpha over a dark palette is visually near-identical here and costs
+        essentially nothing.
+      */}
       <div
         className="film-grain absolute inset-[-60px]"
         style={{
           backgroundImage: GRAIN,
           backgroundRepeat: 'repeat',
-          opacity: 0.16,
-          mixBlendMode: 'overlay',
+          opacity: 0.07,
         }}
       />
     </div>

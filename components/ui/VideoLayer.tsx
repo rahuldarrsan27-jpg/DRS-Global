@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { VIDEO_CUES, type VideoCue } from '@/lib/content';
 import { clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
@@ -115,16 +115,56 @@ const buildWindows = (cues: VideoCue[]): Map<string, Window> =>
     })
   );
 
+/**
+ * Which plates are mounted right now.
+ *
+ * Mounting all ten is the obvious approach and it is quietly ruinous: a video
+ * element is a composited layer whether or not it is playing, so ten of them at
+ * full viewport size means the compositor maintains ten full-screen surfaces for
+ * the entire visit. It was heavy enough to stall frame capture on a desktop,
+ * which is a fair warning about what it does to a phone.
+ *
+ * A sliding window of three — previous, current, next — is all a crossfade can
+ * ever need. The index only changes nine times across the whole journey, and
+ * setting state to an unchanged value does not re-render, so this costs nothing
+ * per frame.
+ */
+const useCueWindow = (cues: VideoCue[]) => {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const t = journey.t;
+      let idx = 0;
+      for (let i = 0; i < cues.length; i++) {
+        if (t >= cues[i].start) idx = i;
+      }
+      setIndex((prev) => (prev === idx ? prev : idx));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cues]);
+
+  return index;
+};
+
 export function VideoLayer() {
   const mask = useGlyphMask();
-  const active = VIDEO_CUES.filter((c) => c.src);
-  const windows = buildWindows(active);
+  const active = useMemo(() => VIDEO_CUES.filter((c) => c.src), []);
+  const windows = useMemo(() => buildWindows(active), [active]);
+  const index = useCueWindow(active);
+
   if (active.length === 0) return null;
+
   return (
     <div className="pointer-events-none fixed inset-0 z-[2] overflow-hidden">
-      {active.map((cue) => (
-        <Plate key={cue.id} cue={cue} mask={mask} window={windows.get(cue.id)!} />
-      ))}
+      {active.map((cue, i) =>
+        Math.abs(i - index) <= 1 ? (
+          <Plate key={cue.id} cue={cue} mask={mask} window={windows.get(cue.id)!} />
+        ) : null
+      )}
     </div>
   );
 }
