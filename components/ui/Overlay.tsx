@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { CHAPTERS, clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
+import { pointer } from '@/lib/pointer';
 import { COPY, BRAND, CTA, CONTACT, ABOUT } from '@/lib/content';
 import { ActionButton } from './ActionButton';
 import { RevealLines } from './RevealLines';
@@ -62,6 +63,7 @@ const BEAT_CONTACT = beat(0.64, 1, true);
 export function Overlay() {
   const panels = useRef<PanelState[]>([]);
   const seen = useRef(new Set<string>());
+  const root = useRef<HTMLDivElement>(null);
 
   const register = (key: string, range: PanelRange) => (el: HTMLDivElement | null) => {
     if (!el) return;
@@ -106,6 +108,18 @@ export function Overlay() {
         }
       }
 
+      /*
+        Typography shifts with the pointer too, but at a quarter of the plate's
+        rate. Moving only the background would read as the picture sliding
+        around behind static text; moving both at different rates is what
+        separates them into planes. Kept small — this must never cost legibility.
+      */
+      if (root.current && pointer.enabled) {
+        root.current.style.transform = `translate3d(${(-pointer.x * 4).toFixed(2)}px, ${(
+          -pointer.y * 3
+        ).toFixed(2)}px, 0)`;
+      }
+
       // The interface accent tracks the world's key light.
       let accent = CHAPTERS[0].light;
       for (const c of CHAPTERS) {
@@ -127,7 +141,7 @@ export function Overlay() {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 select-none">
+    <div ref={root} className="pointer-events-none fixed inset-0 z-10 select-none">
       {/* ---------------------------------------------------------------- I */}
       <Panel
         panelRef={register('forge', { ...CHAPTERS[0], holdIn: true })}

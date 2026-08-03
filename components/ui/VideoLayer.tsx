@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { VIDEO_CUES, type VideoCue } from '@/lib/content';
 import { clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
+import { pointer } from '@/lib/pointer';
 
 /**
  * Cinematic plates composited over the live world.
@@ -244,6 +245,21 @@ function Plate({
       const opacity = inRange ? clamp(fadeIn * fadeOut) * cue.peak : 0;
 
       el.style.opacity = opacity.toFixed(3);
+
+      /*
+        Pointer parallax.
+
+        The plate is scaled slightly so there is margin to move into — without
+        it, translating the frame exposes the page background at the edges. The
+        overlay typography moves the same way but far less, and that difference
+        in rate is the whole effect: two planes at different depths rather than
+        text sitting on a picture.
+      */
+      if (pointer.enabled) {
+        const px = (-pointer.x * 16).toFixed(2);
+        const py = (-pointer.y * 11).toFixed(2);
+        el.style.transform = `scale(1.07) translate3d(${px}px, ${py}px, 0)`;
+      }
 
       // Hold playback until the fetch gate has opened, so a plate never starts
       // pulling bytes ahead of first paint.

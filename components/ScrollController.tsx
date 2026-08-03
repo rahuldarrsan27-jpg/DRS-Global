@@ -10,6 +10,7 @@ import {
   registerScroller,
 } from '@/lib/journeyState';
 import { clamp } from '@/lib/journey';
+import { initPointer, advancePointer } from '@/lib/pointer';
 
 /**
  * Owns scroll. Lenis smooths the input; a second-order damp on top gives the
@@ -42,6 +43,9 @@ export function ScrollController() {
         lenis.scrollTo(target, { duration: opts?.duration ?? 2.4 }),
     });
 
+    // Pointer parallax shares this loop rather than starting its own.
+    const disposePointer = initPointer();
+
     let smoothed = 0;
     let lastRaw = 0;
     let rafId = 0;
@@ -64,6 +68,7 @@ export function ScrollController() {
       const velocity = clamp((raw - lastRaw) / Math.max(dt, 0.0001) / 1.4, -1, 1);
       lastRaw = raw;
 
+      advancePointer(dt);
       commitJourney(smoothed, raw, velocity);
       emitProgress(smoothed);
 
@@ -76,6 +81,7 @@ export function ScrollController() {
       cancelAnimationFrame(rafId);
       motionQuery.removeEventListener('change', onMotionChange);
       registerScroller(null);
+      disposePointer();
       lenis.destroy();
     };
   }, []);
