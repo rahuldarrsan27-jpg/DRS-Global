@@ -102,6 +102,37 @@ To add one: drop the MP4 in `public/video/` and set its `src` in the
 `VIDEO_CUES` table in `lib/content.ts`. That is the only edit — lazy loading,
 decode scheduling, blend mode and opacity ramping are handled.
 
+## Deploy
+
+Vercel, auto-deploy from `main`. No config file is needed — Next.js is detected
+automatically. Every push to `main` ships; every branch gets a preview URL.
+
+First-time setup (the `gh` binary is unpacked in `~/Downloads` but not on PATH):
+
+```bash
+~/Downloads/gh_2.96.0_macOS_amd64/bin/gh auth login
+```
+
+```bash
+~/Downloads/gh_2.96.0_macOS_amd64/bin/gh repo create drs-global --private --source=. --remote=origin --push
+```
+
+Then import the repo at **vercel.com/new**. Framework preset: Next.js. No build
+settings to change, no environment variables.
+
+### Bandwidth is the thing to watch
+
+`public/video/` is **44 MB**. On Vercel's Hobby tier (100 GB/month) that is
+roughly 2,300 full scroll-throughs before the cap — fewer if visitors reload.
+
+Two things already soften this: nothing is fetched until the preloader releases
+and an idle frame passes, and each plate loads only as the journey approaches
+it, so a visitor who bounces early pulls ~8 MB rather than 44 MB.
+
+If traffic grows, move `public/video/` to an object store with cheap egress
+(Cloudflare R2, Bunny) and point the `src` values in `lib/content.ts` at the CDN
+URLs. Nothing else has to change — that table is the only place the paths live.
+
 ## Copy rules
 
 `lib/content.ts` contains **capability claims only**. No invented statistics,
