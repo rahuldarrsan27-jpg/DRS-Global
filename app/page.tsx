@@ -3,6 +3,7 @@ import { ScrollController } from '@/components/ScrollController';
 import { Overlay } from '@/components/ui/Overlay';
 import { Nav } from '@/components/ui/Nav';
 import { ProgressRail } from '@/components/ui/ProgressRail';
+import { MobileProgress } from '@/components/ui/MobileProgress';
 import { Cursor } from '@/components/ui/Cursor';
 import { Preloader } from '@/components/ui/Preloader';
 import { ScrollHint } from '@/components/ui/ScrollHint';
@@ -30,6 +31,7 @@ export default function Page() {
       <Overlay />
       <Nav />
       <ProgressRail />
+      <MobileProgress />
       <ScrollHint />
       <Cursor />
 

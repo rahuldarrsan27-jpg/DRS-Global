@@ -133,19 +133,33 @@ export function Overlay() {
         panelRef={register('forge', { ...CHAPTERS[0], holdIn: true })}
         className="items-center justify-center text-center"
       >
-        <p className="eyebrow reveal-item mb-7">{COPY.forge.eyebrow}</p>
+        {/* Heavily tracked uppercase at 45 characters cannot fit a 375px screen
+            at any usable size — it orphans "SOLUTIONS" onto its own line. The
+            phone gets the short form rather than a bad line break. */}
+        <p className="eyebrow reveal-item mb-7">
+          <span className="sm:hidden">Multi-Sector Engineering</span>
+          <span className="hidden sm:inline">{COPY.forge.eyebrow}</span>
+        </p>
+
         <RevealLines as="h1" text={BRAND.name} className="display mb-8" delay={120} />
+
         <div
           className="hairline reveal-item mb-8 w-[min(560px,70vw)]"
           style={{ transitionDelay: '420ms' }}
         />
+
+        {/* Three phrases: stacked on a phone, one dotted line on a wider screen.
+            Left to wrap naturally it broke between "CONNECTING" and "MARKETS",
+            splitting a phrase across lines. */}
         <p
-          className="reveal-item font-mono text-[clamp(10px,0.9vw,13px)] uppercase tracking-[0.22em] text-[color:var(--muted)]"
+          className="reveal-item flex flex-col items-center gap-1.5 font-mono text-[clamp(10px,0.9vw,13px)] uppercase tracking-[0.22em] text-[color:var(--muted)] sm:block sm:gap-0"
           style={{ transitionDelay: '540ms' }}
         >
-          Engineering Industries<span className="mx-3 text-[color:var(--accent)]">·</span>
-          Connecting Markets<span className="mx-3 text-[color:var(--accent)]">·</span>
-          Enabling Growth
+          <span>Engineering Industries</span>
+          <span className="mx-3 hidden text-[color:var(--accent)] sm:inline">·</span>
+          <span>Connecting Markets</span>
+          <span className="mx-3 hidden text-[color:var(--accent)] sm:inline">·</span>
+          <span>Enabling Growth</span>
         </p>
       </Panel>
 
@@ -269,19 +283,26 @@ export function Overlay() {
       <Panel
         panelRef={register('contact', BEAT_CONTACT)}
         scrim="bottom"
-        className="items-start justify-end pb-[12vh]"
+        /* Tightest panel in the film — the only one at risk of meeting the nav
+           on a short phone, so its rhythm compresses below sm. */
+        className="items-start justify-end pb-[8vh] sm:pb-[12vh]"
       >
         <div className="w-full">
-          <div className="mb-6 flex items-baseline gap-4">
+          <div className="mb-5 flex items-baseline gap-4 sm:mb-6">
             <span className="numeral">{FINAL.numeral}</span>
             <p className="eyebrow">{CTA.prompt}</p>
           </div>
 
-          <div className="grid grid-cols-1 items-end gap-x-14 gap-y-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid grid-cols-1 items-end gap-x-14 gap-y-7 sm:gap-y-10 lg:grid-cols-[1.1fr_0.9fr]">
             {/* The ask */}
             <div>
-              <RevealLines as="h2" text={CTA.headline} className="display-sm mb-6" delay={100} />
-              <p className="lede reveal-item mb-9" style={{ transitionDelay: '300ms' }}>
+              <RevealLines
+                as="h2"
+                text={CTA.headline}
+                className="display-sm mb-4 sm:mb-6"
+                delay={100}
+              />
+              <p className="lede reveal-item mb-6 sm:mb-9" style={{ transitionDelay: '300ms' }}>
                 {CTA.intro}
               </p>
               <div
@@ -302,7 +323,7 @@ export function Overlay() {
               phone number belongs on the page rather than hidden inside a
               button labelled "call".
             */}
-            <div className="pointer-events-auto grid grid-cols-2 gap-x-8 gap-y-7">
+            <div className="pointer-events-auto grid grid-cols-2 gap-x-8 gap-y-5 sm:gap-y-7">
               <div>
                 <p className="contact-label">Email</p>
                 <a href={`mailto:${CONTACT.email}`} data-cursor="hover" className="contact-value">

@@ -43,6 +43,18 @@ export function Nav() {
         <span className="mt-1 block font-mono text-[9px] tracking-[0.3em] text-[color:var(--faint)]">
           GLOBAL
         </span>
+
+        {/* On a phone the division indicator cannot share the top row with
+            CONTACT, and the progress rail is desktop-only — so without this a
+            visitor has no idea where they are in a fifteen-screen scroll. */}
+        <span
+          className="mt-3 block font-mono text-[9px] tracking-[0.24em] text-[color:var(--muted)] sm:hidden"
+          aria-live="polite"
+        >
+          <span className="text-[color:var(--accent)]">{chapter.numeral}</span>
+          <span className="mx-1.5 text-[color:var(--faint)]">/</span>
+          {chapter.label.toUpperCase()}
+        </span>
       </button>
 
       <div className="flex items-start gap-8">
