@@ -9,6 +9,7 @@ import { Preloader } from '@/components/ui/Preloader';
 import { ScrollHint } from '@/components/ui/ScrollHint';
 import { VideoLayer } from '@/components/ui/VideoLayer';
 import { FilmGrain } from '@/components/ui/FilmGrain';
+import { SoundToggle } from '@/components/ui/SoundToggle';
 import { JOURNEY_LENGTH_VH, CHAPTERS } from '@/lib/journey';
 import { COPY, BRAND, CTA, CONTACT, ABOUT } from '@/lib/content';
 
@@ -32,6 +33,7 @@ export default function Page() {
       <Nav />
       <ProgressRail />
       <MobileProgress />
+      <SoundToggle />
       <ScrollHint />
       <Cursor />
 

@@ -231,7 +231,7 @@ export function Overlay() {
                 </div>
 
                 {copy.services && (
-                  <ul className="grid grid-cols-2 gap-x-8 sm:grid-cols-2">
+                  <ul className="service-list grid grid-cols-2 gap-x-8 sm:grid-cols-2">
                     {copy.services.map((s, i) => (
                       <li
                         key={s}

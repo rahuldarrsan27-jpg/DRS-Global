@@ -9,6 +9,7 @@ import { RENDER_DISTRICT_GEOMETRY } from '@/lib/journey';
 import { CameraRig } from './world/CameraRig';
 import { Atmosphere } from './world/Atmosphere';
 import { DepthField } from './world/DepthField';
+import { CursorDraw } from './world/CursorDraw';
 import { Forge } from './world/Forge';
 import { Blueprint } from './world/Blueprint';
 import { Digital } from './world/Digital';
@@ -70,6 +71,9 @@ export function Experience() {
             parallax strata and velocity streaks, the things footage cannot do.
           */}
           <DepthField />
+
+          {/* The one thing that answers to the visitor rather than the scroll. */}
+          <CursorDraw />
 
           {RENDER_DISTRICT_GEOMETRY && (
             <>

@@ -88,16 +88,60 @@
     text-wrap: pretty;
   }
 
+  /* --- service lists ------------------------------------------------------
+     Sixty-plus capability lines across the divisions were inert text. Hovering
+     now pulls focus: the line under the cursor comes forward and takes the
+     chapter accent while its siblings recede, which turns a list you read into
+     a list you browse. Pure CSS — no JS, and it costs nothing when untouched.
+     ------------------------------------------------------------------------ */
+
   .service-item {
+    position: relative;
     font-family: var(--font-mono), monospace;
     font-size: clamp(10px, 0.78vw, 12px);
     letter-spacing: 0.06em;
     color: rgba(238, 240, 243, 0.66);
-    padding: 0.38rem 0;
+    padding: 0.38rem 0 0.38rem 0;
     border-top: 1px solid var(--hairline);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* The marker that slides in from the left edge of the line. */
+  .service-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 0;
+    height: 1px;
+    background: var(--accent);
+    transform: translateY(-50%);
+    transition: width 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .service-list:hover .service-item {
+    color: rgba(238, 240, 243, 0.3);
+    transition:
+      color 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      padding-left 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .service-list .service-item:hover {
+    color: var(--paper);
+    padding-left: 1.15rem;
+  }
+
+  .service-list .service-item:hover::before {
+    width: 0.72rem;
+  }
+
+  /* Touch has no hover state; the dimming would just look like a bug. */
+  @media (pointer: coarse) {
+    .service-list:hover .service-item {
+      color: rgba(238, 240, 243, 0.66);
+    }
   }
 
   /* --- masked line reveal ------------------------------------------------ */
@@ -255,6 +299,21 @@
   animation: grain-shift 1.1s steps(1, end) infinite;
   /* No will-change: promoting a full-viewport layer permanently costs more
      memory and compositor work than the ~1 repaint per second it saves. */
+}
+
+/* Sound toggle level meter. Staggered per bar via inline animation-delay. */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bar {
+  animation: eq 0.9s ease-in-out infinite;
 }
 
 @keyframes trickle {

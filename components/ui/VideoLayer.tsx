@@ -62,6 +62,39 @@ const buildMask = (w: number, h: number) => {
   return `radial-gradient(ellipse ${rx.toFixed(2)}% ${ry.toFixed(2)}% at ${cx.toFixed(2)}% ${cy.toFixed(2)}%, transparent 0%, transparent 55%, black 100%)`;
 };
 
+/**
+ * Mobile policy.
+ *
+ * Two separate problems, both of which read to a visitor as "the video is slow
+ * and out of sync":
+ *
+ *  1. Bytes. An 8 MB 720p plate over cellular is a long wait for a background.
+ *     A 640-wide variant of every clip lives alongside the originals and is
+ *     substituted wholesale — 44 MB of plates becomes 25 MB.
+ *
+ *  2. Decoders. Mobile browsers cap how many videos can decode at once — iOS
+ *     historically at one. Mounting three and playing two guarantees contention:
+ *     clips stall, start late, and drift out of step with the scroll. On a phone
+ *     only the dominant plate is ever allowed to play; the incoming one holds a
+ *     still frame until it takes over. The crossfade survives, the contention
+ *     does not.
+ */
+const useIsMobile = () => {
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const q = window.matchMedia('(max-width: 820px), (pointer: coarse)');
+    const update = () => setMobile(q.matches);
+    update();
+    q.addEventListener('change', update);
+    return () => q.removeEventListener('change', update);
+  }, []);
+
+  return mobile;
+};
+
+const mobileSrc = (src: string) => src.replace('/video/', '/video/mobile/');
+
 /** Recomputes the mask whenever the viewport changes shape. */
 const useGlyphMask = () => {
   const [mask, setMask] = useState('none');
@@ -153,6 +186,7 @@ const useCueWindow = (cues: VideoCue[]) => {
 
 export function VideoLayer() {
   const mask = useGlyphMask();
+  const isMobile = useIsMobile();
   const active = useMemo(() => VIDEO_CUES.filter((c) => c.src), []);
   const windows = useMemo(() => buildWindows(active), [active]);
   const index = useCueWindow(active);
@@ -161,11 +195,21 @@ export function VideoLayer() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[2] overflow-hidden">
-      {active.map((cue, i) =>
-        Math.abs(i - index) <= 1 ? (
-          <Plate key={cue.id} cue={cue} mask={mask} window={windows.get(cue.id)!} />
-        ) : null
-      )}
+      {active.map((cue, i) => {
+        // A phone keeps two elements alive, not three: the outgoing plate is
+        // already past and every extra element is another decoder held open.
+        const near = isMobile ? i - index >= 0 && i - index <= 1 : Math.abs(i - index) <= 1;
+        if (!near) return null;
+        return (
+          <Plate
+            key={cue.id}
+            cue={cue}
+            mask={mask}
+            window={windows.get(cue.id)!}
+            isMobile={isMobile}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -182,10 +226,12 @@ function Plate({
   cue,
   mask,
   window: win,
+  isMobile,
 }: {
   cue: VideoCue;
   mask: string;
   window: Window;
+  isMobile: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const loaded = useRef(false);
@@ -261,9 +307,18 @@ function Plate({
         el.style.transform = `scale(1.07) translate3d(${px}px, ${py}px, 0)`;
       }
 
-      // Hold playback until the fetch gate has opened, so a plate never starts
-      // pulling bytes ahead of first paint.
-      const shouldPlay = opacity > 0.01 && loaded.current;
+      /*
+        Hold playback until the fetch gate has opened, so a plate never starts
+        pulling bytes ahead of first paint.
+
+        On a phone the bar is much higher: only the plate currently carrying the
+        frame is allowed to decode. Two clips decoding at once on a mobile GPU is
+        what makes them start late and drift out of step with the scroll — the
+        incoming plate simply holds its last frame through the crossfade and
+        starts once it is the one being looked at.
+      */
+      const threshold = isMobile ? cue.peak * 0.5 : 0.01;
+      const shouldPlay = opacity > threshold && loaded.current;
       if (shouldPlay && !playing.current) {
         playing.current = true;
         void el.play().catch(() => {
@@ -297,12 +352,12 @@ function Plate({
       */
       playing.current = false;
     };
-  }, [cue]);
+  }, [cue, isMobile]);
 
   return (
     <video
       ref={ref}
-      src={cue.src ?? undefined}
+      src={isMobile && cue.src ? mobileSrc(cue.src) : (cue.src ?? undefined)}
       muted
       loop
       playsInline
