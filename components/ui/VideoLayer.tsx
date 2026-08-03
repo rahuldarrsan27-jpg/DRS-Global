@@ -6,6 +6,7 @@ import { clamp, smoothstep } from '@/lib/journey';
 import { journey } from '@/lib/journeyState';
 import { pointer } from '@/lib/pointer';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { setWantsPlayback, forgetPlayback, initPlaybackUnlock } from '@/lib/playbackUnlock';
 
 /**
  * Cinematic plates composited over the live world.
@@ -184,6 +185,9 @@ const useCueWindow = (cues: VideoCue[]) => {
 };
 
 export function VideoLayer() {
+  // Any gesture is a chance to start a plate a browser refused to autoplay.
+  useEffect(() => initPlaybackUnlock(), []);
+
   const mask = useGlyphMask();
   const isMobile = useIsMobile();
   const active = useMemo(() => VIDEO_CUES.filter((c) => c.src), []);
@@ -249,6 +253,15 @@ function Plate({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    /*
+      Asserted on the element, not left to JSX. React sets `muted` as a DOM
+      property and it does not reliably reach the element as an attribute; a
+      video iOS believes is unmuted is refused outright, which looks exactly
+      like "the poster shows and the video never starts".
+    */
+    el.muted = true;
+    el.defaultMuted = true;
 
     let raf = 0;
 
@@ -351,6 +364,9 @@ function Plate({
         screen in the meantime, so a refusal degrades to a still rather than to
         black.
       */
+      // Tells the gesture unlock which element to start on the next touch.
+      setWantsPlayback(el, shouldPlay);
+
       const now = performance.now();
       if (shouldPlay && el.paused && now - lastPlayAttempt.current > 260) {
         lastPlayAttempt.current = now;
@@ -372,6 +388,7 @@ function Plate({
       if (idleId !== null) window.cancelIdleCallback(idleId);
       if (timerId !== null) window.clearTimeout(timerId);
       el.pause();
+      forgetPlayback(el);
       /*
         Clearing the flag is what makes the cleanup survivable.
 
