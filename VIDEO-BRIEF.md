@@ -7,26 +7,31 @@ into the site. No code changes required — filenames are already wired.
 
 ## 1. The strategy (read this first)
 
-The site renders a **continuous real-time 3D world**. The camera rides one
-mathematical spline from the first frame to the last, so continuity is already
-guaranteed in code. Video is **not** carrying the journey — it is carrying the
-things WebGL is genuinely bad at:
+**The plates carry the environment.** Ten of them, one per chapter, running at
+full strength and crossfading into each other. This is the opposite of the
+original plan and it was arrived at the hard way.
 
-| WebGL wins | Video wins |
-|---|---|
-| Geometry, scale, parallax | Fire, molten metal, sparks |
-| Anything reacting to scroll | Volumetric smoke and heat haze |
-| Crisp typography | Real lens flare, golden-hour atmospherics |
-| Instant load, Lighthouse 95+ | Cloud decks, sky |
+The site began as a fully modelled 3D world with video layered over it as faint
+atmosphere. That fought itself: modelled shards drifting over filmed shards, a
+modelled port behind a filmed port. Two literal descriptions of the same subject
+do not add up to depth — they add up to noise. The modelled districts are still
+in the codebase, disabled behind `RENDER_DISTRICT_GEOMETRY` in `lib/journey.ts`.
 
-So each clip is composited **over** the live world in `screen` blend mode — it
-adds light and atmosphere, it does not replace the frame. This is why the plates
-don't need to match each other: they need to match the *lighting* of the moment
-they land in.
+What the real-time layer does now is what footage cannot: scroll-velocity light
+streaks, and the camera spline that drives the typography and crossfade timing.
+The photographic finish — grain, vignette — is CSS over the whole frame.
 
-**Consequence: you do not need to frame-chain between shots.** The four plates are
-separated by 25–40 % of the journey each. They are never on screen together.
-Chain only when extending a single shot past one generation.
+**What this means for generating clips:**
+
+- Each plate must stand on its own as a full frame. It is not a light overlay any
+  more; it is the shot.
+- Camera motion must match the spline tangent at that point in the journey. The
+  direction notes on each shot below are derived from the actual control points
+  in `lib/journey.ts`, not chosen for variety. A plate drifting against the live
+  camera reads as wrong instantly.
+- **You do not need to frame-chain between shots.** Adjacent plates are 25–40 %
+  of the journey apart and never share a frame; the crossfade handles the seam.
+  Chain only when extending a single shot past one generation.
 
 ---
 
@@ -48,45 +53,21 @@ cheap):
 
 ---
 
-## 2b. SHOT 00 — the opening, and the only true chain
+## 2b. The opening
 
-**File** `spark-ignition.mp4` · **journey** 0.000 → 0.055 · **x4**
+`forge-plate.mp4` opens the film directly, holding at full strength from the
+very first frame.
 
-This is the one place in the whole film where frame-chaining actually matters.
-Every other pair of plates is 25–40 % of the journey apart and never shares a
-frame. This one runs *directly* into `forge-plate`, so the handoff is visible.
+An earlier plan put a separate fire-sparks clip in front of it, chained by using
+forge-plate's own first frame as the sparks clip's end frame. That was dropped —
+the forge plate opens strongly enough on its own, and it was the only place in
+the whole film where frame-chaining would have mattered. Every other pair of
+plates is 25-40 % of the journey apart and never shares a frame.
 
-**Method — Frames to Video with an END frame:**
-
-1. The exact first frame of `forge-plate.mp4` has been extracted to
-   `~/Downloads/FORGE-FIRST-FRAME.png` (1280×720). It shows a single fractured
-   steel fragment, centre frame, glowing molten orange along an X of cracks,
-   against pure black with soft bokeh.
-2. In Flow, use **Frames to Video** and set that image as the **end frame**.
-3. Use the prompt below. It is written to converge on exactly that image, so the
-   model has somewhere to land.
-
-Because the last frame of this clip is the first frame of the next, the
-crossfade between them has nothing to dissolve — it reads as one continuous
-take.
-
-```
-Pure black darkness. A sudden shower of bright orange fire sparks erupts and
-drifts slowly through empty black space, like sparks struck from hot steel.
-Individual embers glow white-hot at their cores and cool to deep red as they
-float. Fine industrial dust hangs in the air, catching the light. The sparks
-gradually settle and converge, and a single dark fractured fragment of steel
-drifts into the centre of frame, glowing molten orange along the cracks running
-through it. Camera drifts slowly backward. Macro, extremely shallow depth of
-field, soft bokeh, pure black background, no environment. Shot on ARRI Alexa,
-50mm macro, fine film grain. Ultra-slow, weightless motion.
-```
-
-To regenerate the end frame after replacing `forge-plate`, the extractor lives at
-`scripts/extractframe.swift`:
+If it is ever revisited, the extractor is at `scripts/extractframe.swift`:
 
 ```bash
-swift scripts/extractframe.swift public/video/forge-plate.mp4 ~/Downloads/FORGE-FIRST-FRAME.png 0.0
+swift scripts/extractframe.swift public/video/forge-plate.mp4 ~/Downloads/first-frame.png 0.0
 ```
 
 ---

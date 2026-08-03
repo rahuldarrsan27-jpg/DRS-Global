@@ -268,25 +268,13 @@ export interface VideoCue {
  */
 export const VIDEO_CUES: VideoCue[] = [
   {
-    id: 'spark-ignition',
-    src: null,
-    start: 0.0,
-    end: 0.055,
-    blend: 'screen',
-    peak: 1,
-    note:
-      'OPENING — Fire sparks in pure darkness. Plays on load. Its FINAL frame is ' +
-      'the FIRST frame of forge-plate, so the two read as one continuous take ' +
-      'rather than a dissolve.',
-  },
-  {
     id: 'forge-plate',
     src: '/video/forge-plate.mp4',
-    start: 0.038,
+    start: 0.0,
     end: 0.115,
     blend: 'screen',
     peak: 1,
-    note: 'I — Molten steel fragments assembling in darkness.',
+    note: 'I — Molten steel fragments assembling in darkness. Opens the film.',
   },
   {
     id: 'descent-fracture',
