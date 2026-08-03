@@ -1,0 +1,265 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { VIDEO_CUES, type VideoCue } from '@/lib/content';
+import { clamp, smoothstep } from '@/lib/journey';
+import { journey } from '@/lib/journeyState';
+
+/**
+ * Cinematic plates composited over the live world.
+ *
+ * Design rules that keep this from wrecking performance:
+ *  - `preload="none"` until the journey approaches the cue, so nothing is
+ *    fetched for a plate the visitor may never scroll to
+ *  - playback is started and stopped at the range edges — an off-screen video
+ *    element that keeps decoding is a silent battery and main-thread cost
+ *  - opacity is written straight to style, never through React state, so the
+ *    ramp costs nothing per frame
+ *  - every element is muted and playsInline; autoplay with sound is blocked by
+ *    browsers regardless of what the source contains
+ *
+ * With no video files present this renders nothing at all and the site is
+ * complete without it.
+ */
+/**
+ * Watermark mask.
+ *
+ * Every generated plate carries a small glyph near the bottom-right of its
+ * frame. Because the layer composites in `screen`, a masked-out region
+ * contributes nothing at all — zero alpha behaves exactly like black, which is
+ * the identity value for that blend. So this removes the glyph without
+ * darkening anything or leaving a patch: the live 3D world simply shows through
+ * unmodified there.
+ *
+ * The subtlety is WHERE to put it. The video is `object-fit: cover`, so its
+ * intrinsic frame is scaled and cropped differently at every viewport aspect
+ * ratio — a mask pinned to element percentages sits over the glyph only on an
+ * exactly 16:9 screen, and drifts to cut a visible hole in empty frame
+ * everywhere else. So the position is derived from the actual cover mapping and
+ * recomputed on resize, keeping it locked to the glyph in *video-frame* space.
+ */
+const VIDEO_ASPECT = 16 / 9;
+
+/** Glyph centre and mask radii, as fractions of the source frame. */
+const GLYPH = { u: 0.908, v: 0.832, ru: 0.055, rv: 0.075 };
+
+const buildMask = (w: number, h: number) => {
+  if (w <= 0 || h <= 0) return 'none';
+
+  // Replicate object-fit: cover — the larger scale wins, the excess is cropped.
+  const containerAspect = w / h;
+  const drawnW = containerAspect > VIDEO_ASPECT ? w : h * VIDEO_ASPECT;
+  const drawnH = containerAspect > VIDEO_ASPECT ? w / VIDEO_ASPECT : h;
+  const offsetX = (drawnW - w) / 2;
+  const offsetY = (drawnH - h) / 2;
+
+  const cx = ((GLYPH.u * drawnW - offsetX) / w) * 100;
+  const cy = ((GLYPH.v * drawnH - offsetY) / h) * 100;
+  const rx = ((GLYPH.ru * drawnW) / w) * 100;
+  const ry = ((GLYPH.rv * drawnH) / h) * 100;
+
+  return `radial-gradient(ellipse ${rx.toFixed(2)}% ${ry.toFixed(2)}% at ${cx.toFixed(2)}% ${cy.toFixed(2)}%, transparent 0%, transparent 55%, black 100%)`;
+};
+
+/** Recomputes the mask whenever the viewport changes shape. */
+const useGlyphMask = () => {
+  const [mask, setMask] = useState('none');
+
+  useEffect(() => {
+    const update = () => setMask(buildMask(window.innerWidth, window.innerHeight));
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  return mask;
+};
+
+interface Window {
+  inFrom: number;
+  inTo: number;
+  outFrom: number;
+  outTo: number;
+}
+
+/**
+ * Complementary crossfade windows.
+ *
+ * Each plate fades out across exactly the span its successor fades in across,
+ * so at any instant the pair sums to roughly one plate's worth of light.
+ *
+ * The alternative — giving every plate its own symmetric ramp — looks correct in
+ * isolation and is wrong in practice: with overlapping ranges, both plates sit
+ * at FULL strength through the middle of the overlap and screen-blend on top of
+ * each other into a washed-out double exposure. The handoff has to be derived
+ * from the neighbours, not from each cue alone.
+ *
+ * Computed over the cues that actually have a file, so an unfilled slot never
+ * opens a hole — and the first available plate holds from the very first frame,
+ * since there is no scroll yet to fade it in.
+ */
+const buildWindows = (cues: VideoCue[]): Map<string, Window> =>
+  new Map(
+    cues.map((cue, i) => {
+      const prev = cues[i - 1];
+      const next = cues[i + 1];
+      return [
+        cue.id,
+        {
+          inFrom: prev ? cue.start : 0,
+          inTo: prev ? Math.min(prev.end, cue.end) : 0,
+          outFrom: next ? Math.max(next.start, cue.start) : cue.end,
+          outTo: cue.end,
+        },
+      ];
+    })
+  );
+
+export function VideoLayer() {
+  const mask = useGlyphMask();
+  const active = VIDEO_CUES.filter((c) => c.src);
+  const windows = buildWindows(active);
+  if (active.length === 0) return null;
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[2] overflow-hidden">
+      {active.map((cue) => (
+        <Plate key={cue.id} cue={cue} mask={mask} window={windows.get(cue.id)!} />
+      ))}
+    </div>
+  );
+}
+
+/*
+  Plates play at their own constant rate.
+
+  Tying playback speed to scroll velocity was tried and removed: it makes the
+  footage lurch and stall with every wheel tick, which reads as a stutter rather
+  than as responsiveness. Scroll already drives the camera, the crossfades and
+  the depth layer — the footage itself is better left to run at its own pace.
+*/
+function Plate({
+  cue,
+  mask,
+  window: win,
+}: {
+  cue: VideoCue;
+  mask: string;
+  window: Window;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const loaded = useRef(false);
+  const playing = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    let raf = 0;
+
+    /*
+      Fetching is gated on the page being past its own load.
+
+      The opening plate sits at journey position zero, so a naive "load when
+      near" rule would put a multi-megabyte video in direct contention with the
+      first paint — the one moment where bytes cost the most. Waiting for the
+      preloader to hand off and then for an idle frame keeps the critical path
+      clear. The world is already complete without the plate; it simply joins
+      once it is ready.
+    */
+    let gateOpen = false;
+    const openGate = () => {
+      gateOpen = true;
+    };
+    const hasIdle = typeof window.requestIdleCallback === 'function';
+    const idleId = hasIdle
+      ? window.requestIdleCallback(openGate, { timeout: 2500 })
+      : null;
+    const timerId = hasIdle ? null : window.setTimeout(openGate, 1200);
+
+    const tick = () => {
+      const t = journey.t;
+
+      /*
+        Open the element up for fetching once we're near the cue.
+
+        Deliberately does NOT call load(). load() resets the media element and
+        aborts any play() already in flight — and since playback is started the
+        moment opacity goes positive, that reset silently strands the video
+        paused on its first frame with no retry. Raising `preload` is enough of a
+        hint; play() drives the fetch itself.
+      */
+      const near = t > win.inFrom - 0.1 && t < cue.end + 0.1;
+      if (near && gateOpen && journey.ready && !loaded.current) {
+        loaded.current = true;
+        el.preload = 'auto';
+      }
+
+      // Degenerate windows mean "no fade on this side" — the first plate is
+      // already up when the journey starts, the last never hands off.
+      const fadeIn = win.inTo > win.inFrom ? smoothstep(win.inFrom, win.inTo, t) : 1;
+      const fadeOut =
+        win.outTo > win.outFrom ? 1 - smoothstep(win.outFrom, win.outTo, t) : 1;
+
+      const inRange = t >= win.inFrom - 0.001 && t <= cue.end + 0.001;
+      const opacity = inRange ? clamp(fadeIn * fadeOut) * cue.peak : 0;
+
+      el.style.opacity = opacity.toFixed(3);
+
+      // Hold playback until the fetch gate has opened, so a plate never starts
+      // pulling bytes ahead of first paint.
+      const shouldPlay = opacity > 0.01 && loaded.current;
+      if (shouldPlay && !playing.current) {
+        playing.current = true;
+        void el.play().catch(() => {
+          // A rejected play must clear the flag, otherwise the retry never comes
+          // and the plate is stranded on a still frame for the whole visit.
+          playing.current = false;
+        });
+      } else if (!shouldPlay && playing.current) {
+        playing.current = false;
+        el.pause();
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (idleId !== null) window.cancelIdleCallback(idleId);
+      if (timerId !== null) window.clearTimeout(timerId);
+      el.pause();
+      /*
+        Clearing the flag is what makes the cleanup survivable.
+
+        `playing` is a ref, so it outlives the effect — but the pause above does
+        not. StrictMode's mount/cleanup/remount in development therefore leaves
+        the element paused while the flag still claims it is playing, and the
+        `!playing.current` guard then blocks play() from ever being re-issued.
+        The plate stays frozen on a still frame for the entire visit. The
+        element's real state and the flag have to be reset together.
+      */
+      playing.current = false;
+    };
+  }, [cue]);
+
+  return (
+    <video
+      ref={ref}
+      src={cue.src ?? undefined}
+      muted
+      loop
+      playsInline
+      preload="none"
+      aria-hidden="true"
+      tabIndex={-1}
+      className="absolute inset-0 h-full w-full object-cover opacity-0"
+      style={{
+        mixBlendMode: cue.blend === 'screen' ? 'screen' : 'normal',
+        willChange: 'opacity',
+        maskImage: mask,
+        WebkitMaskImage: mask,
+      }}
+    />
+  );
+}
